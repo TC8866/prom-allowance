@@ -1,0 +1,19 @@
+servers:
+  - 127.0.0.1
+before:
+  - echo "**** START DEPLOY ****"
+  - /home/webedit/bin/springboot_consul prom-allowance pause
+  - sleep 10s
+  - /home/webedit/bin/springboot_init prom-allowance stop
+target: /home/webapps/prom-allowance
+scripts:
+  - echo "**** scripts start **** "
+  - /home/webedit/bin/springboot_init prom-allowance start
+  - sleep 20s
+  - /home/webedit/bin/springboot_consul prom-allowance unpause
+  - echo "**** SUCCESS DEPLOY ****"
+emails:
+  - yxbackend@mail.netease.com
+  - yanxuanqa@groups.163.com
+whites:
+  - yxbackend@mail.netease.com

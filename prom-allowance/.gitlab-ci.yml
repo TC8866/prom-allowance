@@ -1,0 +1,166 @@
+variables:
+  PRE_CMD: '--projectId=$CI_PROJECT_ID
+                 --buildId=$CI_BUILD_ID
+                 --buildRef=$CI_BUILD_REF
+                 --refName=$CI_BUILD_REF_NAME
+                 --server=10.200.169.38:8912'
+  PUB_CMD: '--projectId=$CI_PROJECT_ID
+                   --projectName=$CI_PROJECT_NAME
+                   --buildId=$CI_BUILD_ID
+                   --buildRef=$CI_BUILD_REF
+                   --refName=$CI_BUILD_REF_NAME
+                   --commiter=$GITLAB_USER_EMAIL
+                   --server=10.200.169.38:8912'
+  PROJ_NAME: 'prom-allowance'
+
+stages:
+  - package
+  - grayDeploy
+  - deploy
+
+
+test_package:
+  stage: package
+  script:
+    - mvn clean package -Dmaven.test.skip=true -Ptest
+    - mv build/$PROJ_NAME.zip ./
+    - pigpre $PRE_CMD
+  tags:
+    - yxpig
+  artifacts:
+    name: $PROJ_NAME
+    paths:
+      - $PROJ_NAME.zip
+    expire_in: 7d
+  only:
+      - /^dev.*$/
+      - /^feature.*$/
+      - /^bugfix.*$/
+  except:
+      - /^dev-release.*$/
+      - /^dev-pressure.*$/
+
+test_deploy:
+  stage: deploy
+  script:
+    - pigpub  $PUB_CMD --deployConfig=deploy/deploy-test.yml
+  after_script:
+    - pigcancel $PRE_CMD
+  environment: test
+  tags:
+    - yxpig
+  dependencies: []
+  only:
+      - /^dev.*$/
+      - /^feature.*$/
+      - /^bugfix.*$/
+  except:
+      - /^dev-release.*$/
+      - /^dev-pressure.*$/
+
+online_package:
+  stage: package
+  script:
+    - mvn clean package -Dmaven.test.skip=true -Ponline
+    - mv build/$PROJ_NAME.zip ./
+    - pigpre $PRE_CMD
+  tags:
+    - yxpig
+  artifacts:
+    name: $PROJ_NAME
+    paths:
+      - $PROJ_NAME.zip
+    expire_in: 30d
+  only:
+      - /^release.*$/
+      - /^master.*$/
+
+online_gray_deploy:
+  stage: grayDeploy
+  script:
+    - pigpub  $PUB_CMD --deployConfig=deploy/deploy-gray.yml  --changeLog=deploy/change/gray-change-log.md
+  after_script:
+    - pigcancel $PRE_CMD
+  environment: online
+  tags:
+    - yxpig
+  dependencies: []
+  when: manual
+  only:
+      - /^release.*$/
+      - /^master.*$/
+
+online_deploy:
+  stage: deploy
+  script:
+    - pigpub  $PUB_CMD --deployConfig=deploy/deploy-online.yml  --changeLog=deploy/change/change-log.md
+  after_script:
+    - pigcancel $PRE_CMD
+  environment: online
+  tags:
+    - yxpig
+  dependencies: []
+  when: manual
+  only:
+      - /^release.*$/
+      - /^master.*$/
+
+release_package:
+  stage: package
+  script:
+    - mvn clean package -Dmaven.test.skip=true -Prelease
+    - mv build/$PROJ_NAME.zip ./
+    - pigpre $PRE_CMD
+  tags:
+    - yxpig
+  artifacts:
+    name: $PROJ_NAME
+    paths:
+      - $PROJ_NAME.zip
+    expire_in: 7d
+  only:
+      - /^dev-release.*$/
+
+release_deploy:
+  stage: deploy
+  script:
+    - pigpub  $PUB_CMD --deployConfig=deploy/deploy-release.yml
+  after_script:
+    - pigcancel $PRE_CMD
+  environment: release
+  tags:
+    - yxpig
+  dependencies: []
+  when: manual
+  only:
+      - /^dev-release.*$/
+
+pressure_package:
+  stage: package
+  script:
+    - mvn clean package -Dmaven.test.skip=true -Ppressure
+    - mv build/$PROJ_NAME.zip ./
+    - pigpre $PRE_CMD
+  tags:
+    - yxpig
+  artifacts:
+    name: $PROJ_NAME
+    paths:
+      - $PROJ_NAME.zip
+    expire_in: 7d
+  only:
+      - /^dev-pressure.*$/
+
+pressure_deploy:
+  stage: deploy
+  script:
+    - pigpub  $PUB_CMD --deployConfig=deploy/deploy-pressure.yml
+  after_script:
+    - pigcancel $PRE_CMD
+  environment: pressure
+  tags:
+    - yxpig
+  dependencies: []
+  when: manual
+  only:
+      - /^dev-pressure.*$/
